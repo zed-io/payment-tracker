@@ -1,65 +1,256 @@
-import Image from "next/image";
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import Image from 'next/image'
+import { supabase } from '@/lib/supabase'
+import { Vendor, Transaction } from '@/lib/database.types'
+import VendorSelect from '@/components/VendorSelect'
+import PaymentForm from '@/components/PaymentForm'
+import VendorManager from '@/components/VendorManager'
+import TransactionList from '@/components/TransactionList'
+import DashboardSummary from '@/components/DashboardSummary'
+
+type Tab = 'payment' | 'vendors' | 'transactions' | 'summary'
 
 export default function Home() {
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('payment')
+  const [loading, setLoading] = useState(true)
+  const [lastPayment, setLastPayment] = useState<{ amount: number; vendor: string } | null>(null)
+
+  const fetchVendors = useCallback(async () => {
+    const { data } = await supabase
+      .from('vendors')
+      .select('*')
+      .order('name')
+    if (data) setVendors(data)
+  }, [])
+
+  const fetchTransactions = useCallback(async () => {
+    const { data } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (data) setTransactions(data)
+  }, [])
+
+  const fetchAll = useCallback(async () => {
+    await Promise.all([fetchVendors(), fetchTransactions()])
+    setLoading(false)
+  }, [fetchVendors, fetchTransactions])
+
+  useEffect(() => {
+    fetchAll()
+
+    // Subscribe to realtime updates
+    const vendorsChannel = supabase
+      .channel('vendors-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendors' }, () => {
+        fetchVendors()
+      })
+      .subscribe()
+
+    const transactionsChannel = supabase
+      .channel('transactions-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+        fetchTransactions()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(vendorsChannel)
+      supabase.removeChannel(transactionsChannel)
+    }
+  }, [fetchAll, fetchVendors, fetchTransactions])
+
+  const handlePaymentAdded = () => {
+    if (selectedVendor) {
+      setLastPayment({ amount: 0, vendor: selectedVendor.name })
+      setTimeout(() => setLastPayment(null), 3000)
+    }
+    fetchTransactions()
+  }
+
+  const tabs = [
+    { id: 'payment' as Tab, label: 'Record Payment', icon: '💳' },
+    { id: 'vendors' as Tab, label: 'Vendors', icon: '🏪' },
+    { id: 'transactions' as Tab, label: 'Transactions', icon: '📋' },
+    { id: 'summary' as Tab, label: 'Summary', icon: '📊' },
+  ]
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm sticky top-0 z-40">
+        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              src="/wam-logo.svg"
+              alt="Wam Logo"
+              width={40}
+              height={40}
+              className="object-contain"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">Payment Tracker</h1>
+              <p className="text-xs text-gray-500">Market POS System</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-500">Today&apos;s Total</p>
+            <p className="text-lg font-bold text-green-600">
+              ${transactions.reduce((sum, t) => sum + Number(t.amount), 0).toFixed(2)}
+            </p>
+          </div>
         </div>
+      </header>
+
+      {/* Tab Navigation */}
+      <nav className="bg-white border-b sticky top-[68px] z-30">
+        <div className="max-w-2xl mx-auto px-4">
+          <div className="flex overflow-x-auto">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeTab === tab.id
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
+
+      {/* Success Toast */}
+      {lastPayment && (
+        <div className="fixed top-20 right-4 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-pulse">
+          Payment recorded!
+        </div>
+      )}
+
+      {/* Main Content */}
+      <main className="max-w-2xl mx-auto px-4 py-6">
+        {activeTab === 'payment' && (
+          <div className="space-y-6">
+            {vendors.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-xl border">
+                <p className="text-gray-500 mb-4">No vendors yet. Add a vendor to start recording payments.</p>
+                <button
+                  onClick={() => setActiveTab('vendors')}
+                  className="px-6 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                >
+                  Add First Vendor
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border p-4 space-y-4">
+                <VendorSelect
+                  vendors={vendors}
+                  selectedVendor={selectedVendor}
+                  onSelect={setSelectedVendor}
+                />
+
+                {selectedVendor ? (
+                  <PaymentForm
+                    vendor={selectedVendor}
+                    onPaymentAdded={handlePaymentAdded}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    Select a vendor above to record a payment
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Quick Stats for selected vendor */}
+            {selectedVendor && (
+              <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                <h3 className="font-medium text-blue-800 mb-2">{selectedVendor.name} Today</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-blue-600">Total</p>
+                    <p className="text-2xl font-bold text-blue-800">
+                      ${transactions
+                        .filter(t => t.vendor_id === selectedVendor.id)
+                        .reduce((sum, t) => sum + Number(t.amount), 0)
+                        .toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-blue-600">Transactions</p>
+                    <p className="text-2xl font-bold text-blue-800">
+                      {transactions.filter(t => t.vendor_id === selectedVendor.id).length}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'vendors' && (
+          <div className="bg-white rounded-xl shadow-sm border p-4">
+            <VendorManager
+              vendors={vendors}
+              onVendorsChange={fetchVendors}
+            />
+          </div>
+        )}
+
+        {activeTab === 'transactions' && (
+          <div className="bg-white rounded-xl shadow-sm border p-4">
+            <div className="mb-4">
+              <VendorSelect
+                vendors={vendors}
+                selectedVendor={selectedVendor}
+                onSelect={setSelectedVendor}
+              />
+              {selectedVendor && (
+                <button
+                  onClick={() => setSelectedVendor(null)}
+                  className="mt-2 text-sm text-blue-600 hover:underline"
+                >
+                  Show all vendors
+                </button>
+              )}
+            </div>
+            <TransactionList
+              transactions={transactions}
+              vendors={vendors}
+              onTransactionsChange={fetchTransactions}
+              selectedVendorId={selectedVendor?.id}
+            />
+          </div>
+        )}
+
+        {activeTab === 'summary' && (
+          <DashboardSummary
+            transactions={transactions}
+            vendors={vendors}
+          />
+        )}
       </main>
     </div>
-  );
+  )
 }
