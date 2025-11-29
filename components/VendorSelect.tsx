@@ -11,7 +11,7 @@ interface VendorSelectProps {
 export default function VendorSelect({ vendors, selectedVendor, onSelect }: VendorSelectProps) {
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">
         Select Vendor
       </label>
       <select
@@ -20,7 +20,7 @@ export default function VendorSelect({ vendors, selectedVendor, onSelect }: Vend
           const vendor = vendors.find(v => v.id === e.target.value)
           onSelect(vendor || null)
         }}
-        className="w-full px-4 py-3 text-lg border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+        className="w-full px-4 py-3 text-lg glass-input"
       >
         <option value="">-- Select a vendor --</option>
         {vendors.map((vendor) => (

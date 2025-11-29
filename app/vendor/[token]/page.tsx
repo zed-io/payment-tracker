@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, use } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { Vendor, Transaction } from '@/lib/database.types'
+import { CreditCardIcon, CashIcon, DotsIcon, WifiIcon, ClockIcon } from '@/components/Icons'
 
 interface Props {
   params: Promise<{ token: string }>
@@ -53,7 +54,6 @@ export default function VendorPublicView({ params }: Props) {
       fetchTransactions()
       setLoading(false)
 
-      // Subscribe to realtime updates for this vendor's transactions
       const channel = supabase
         .channel(`vendor-${vendor.id}-transactions`)
         .on(
@@ -94,12 +94,20 @@ export default function VendorPublicView({ params }: Props) {
     .filter(t => t.payment_method === 'cash')
     .reduce((sum, t) => sum + Number(t.amount), 0)
 
+  const PaymentMethodIcon = ({ method }: { method: string }) => {
+    switch (method) {
+      case 'card': return <CreditCardIcon className="w-4 h-4" />
+      case 'cash': return <CashIcon className="w-4 h-4" />
+      default: return <DotsIcon className="w-4 h-4" />
+    }
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="w-10 h-10 border-4 border-[#B34AFF] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading...</p>
         </div>
       </div>
     )
@@ -107,93 +115,107 @@ export default function VendorPublicView({ params }: Props) {
 
   if (error || !vendor) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 text-xl">{error || 'Vendor not found'}</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center glass-card p-8">
+          <p className="text-red-500 text-xl">{error || 'Vendor not found'}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen pb-8">
       {/* Header */}
-      <header className="bg-white shadow-sm">
+      <header className="glass">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
             <Image
               src="/wam-logo.svg"
               alt="Wam Logo"
-              width={36}
-              height={36}
+              width={40}
+              height={40}
               className="object-contain"
             />
             <div>
               <p className="text-xs text-gray-500">Powered by Wam</p>
-              <h1 className="text-xl font-bold text-gray-800">{vendor.name}</h1>
+              <h1 className="text-xl font-bold text-foreground">{vendor.name}</h1>
             </div>
           </div>
         </div>
       </header>
 
       {/* Live Indicator */}
-      <div className="bg-green-500 text-white text-center py-1.5 text-sm">
-        <span className="inline-block w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></span>
-        Live Updates Enabled
+      <div className="bg-gradient-to-r from-[#43FF52] to-[#38d946] text-white text-center py-2 text-sm font-medium">
+        <span className="flex items-center justify-center gap-2">
+          <WifiIcon className="w-4 h-4 animate-pulse" />
+          Live Updates Enabled
+        </span>
       </div>
 
       {/* Stats Cards */}
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white">
-            <p className="text-green-100 text-sm">Total Collected</p>
-            <p className="text-4xl font-bold">${totalAmount.toFixed(2)}</p>
-            <p className="text-green-100 text-sm mt-1">
+          <div className="glass-card p-5 bg-gradient-to-br from-[#43FF52]/20 to-[#43FF52]/5">
+            <div className="flex items-center gap-2 mb-2">
+              <CreditCardIcon className="w-5 h-5 text-[#43FF52]" />
+              <p className="text-sm text-gray-500">Total Collected</p>
+            </div>
+            <p className="text-4xl font-bold font-number text-gradient-green">${totalAmount.toFixed(2)}</p>
+            <p className="text-sm text-gray-500 mt-1">
               {transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white">
-            <p className="text-blue-100 text-sm">Card Payments</p>
-            <p className="text-3xl font-bold">${cardTotal.toFixed(2)}</p>
-            <p className="text-blue-100 text-sm mt-1">
+
+          <div className="glass-card p-5 bg-gradient-to-br from-[#B34AFF]/20 to-[#B34AFF]/5">
+            <div className="flex items-center gap-2 mb-2">
+              <CreditCardIcon className="w-5 h-5 text-[#B34AFF]" />
+              <p className="text-sm text-gray-500">Card Payments</p>
+            </div>
+            <p className="text-3xl font-bold font-number text-gradient-purple">${cardTotal.toFixed(2)}</p>
+            <p className="text-sm text-gray-500 mt-1">
               {transactions.filter(t => t.payment_method === 'card').length} transaction{transactions.filter(t => t.payment_method === 'card').length !== 1 ? 's' : ''}
             </p>
           </div>
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 text-white">
-            <p className="text-emerald-100 text-sm">Cash Payments</p>
-            <p className="text-3xl font-bold">${cashTotal.toFixed(2)}</p>
-            <p className="text-emerald-100 text-sm mt-1">
+
+          <div className="glass-card p-5 bg-gradient-to-br from-[#43FF52]/20 to-[#43FF52]/5">
+            <div className="flex items-center gap-2 mb-2">
+              <CashIcon className="w-5 h-5 text-[#43FF52]" />
+              <p className="text-sm text-gray-500">Cash Payments</p>
+            </div>
+            <p className="text-3xl font-bold font-number text-gradient-green">${cashTotal.toFixed(2)}</p>
+            <p className="text-sm text-gray-500 mt-1">
               {transactions.filter(t => t.payment_method === 'cash').length} transaction{transactions.filter(t => t.payment_method === 'cash').length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
 
         {/* Recent Transactions */}
-        <div className="bg-white rounded-xl shadow-sm border">
-          <div className="p-4 border-b">
-            <h2 className="text-lg font-semibold text-gray-800">Recent Payments</h2>
+        <div className="glass-card">
+          <div className="p-4 border-b border-gray-200/50 dark:border-gray-700/50">
+            <h2 className="text-lg font-semibold text-foreground">Recent Payments</h2>
           </div>
-          <div className="divide-y max-h-96 overflow-y-auto">
+          <div className="divide-y divide-gray-200/50 dark:divide-gray-700/50 max-h-96 overflow-y-auto">
             {transactions.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No payments yet</p>
+              <p className="text-gray-500 text-center py-12">No payments yet</p>
             ) : (
               transactions.map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="p-4 flex items-center justify-between hover:bg-gray-50"
+                  className="p-4 flex items-center justify-between hover:bg-gray-50/50 dark:hover:bg-gray-800/50 transition-colors"
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl font-bold text-green-600">
+                      <span className="text-xl font-bold font-number text-gradient-green">
                         ${Number(transaction.amount).toFixed(2)}
                       </span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      <span className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg ${
                         transaction.payment_method === 'card'
-                          ? 'bg-blue-100 text-blue-700'
+                          ? 'badge-card'
                           : transaction.payment_method === 'cash'
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-700'
+                          ? 'badge-cash'
+                          : 'badge-other'
                       }`}>
+                        <PaymentMethodIcon method={transaction.payment_method} />
                         {transaction.payment_method}
                       </span>
                     </div>
@@ -201,7 +223,10 @@ export default function VendorPublicView({ params }: Props) {
                       <p className="text-sm text-gray-500 mt-0.5">{transaction.description}</p>
                     )}
                   </div>
-                  <p className="text-sm text-gray-400">{formatDate(transaction.created_at)}</p>
+                  <p className="flex items-center gap-1 text-sm text-gray-400">
+                    <ClockIcon className="w-3.5 h-3.5" />
+                    {formatDate(transaction.created_at)}
+                  </p>
                 </div>
               ))
             )}

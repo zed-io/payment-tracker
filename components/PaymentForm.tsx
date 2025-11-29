@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Vendor } from '@/lib/database.types'
 import { supabase } from '@/lib/supabase'
+import { CreditCardIcon, CashIcon, DotsIcon } from '@/components/Icons'
 
 interface PaymentFormProps {
   vendor: Vendor
@@ -53,21 +54,27 @@ export default function PaymentForm({ vendor, onPaymentAdded }: PaymentFormProps
 
   const quickAmounts = [5, 10, 15, 20, 25, 50]
 
+  const paymentMethods = [
+    { id: 'card' as const, label: 'Card', icon: CreditCardIcon },
+    { id: 'cash' as const, label: 'Cash', icon: CashIcon },
+    { id: 'other' as const, label: 'Other', icon: DotsIcon },
+  ]
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <p className="text-sm text-blue-600">Recording payment for</p>
-        <p className="text-xl font-bold text-blue-800">{vendor.name}</p>
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="p-4 glass-card bg-gradient-to-r from-[#B34AFF]/10 to-[#B34AFF]/5">
+        <p className="text-sm text-[#B34AFF]">Recording payment for</p>
+        <p className="text-xl font-bold text-foreground">{vendor.name}</p>
       </div>
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-3 glass-card bg-red-500/10 text-red-600 text-sm border-l-4 border-red-500">
           {error}
         </div>
       )}
 
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">
           Amount ($)
         </label>
         <input
@@ -77,7 +84,7 @@ export default function PaymentForm({ vendor, onPaymentAdded }: PaymentFormProps
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="0.00"
-          className="w-full px-4 py-4 text-2xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
+          className="w-full px-4 py-5 text-4xl font-bold font-number glass-input text-center"
           required
         />
         <div className="grid grid-cols-3 gap-2">
@@ -86,7 +93,7 @@ export default function PaymentForm({ vendor, onPaymentAdded }: PaymentFormProps
               key={amt}
               type="button"
               onClick={() => setAmount(amt.toString())}
-              className="px-3 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              className="btn-secondary px-3 py-2.5 text-sm font-number"
             >
               ${amt}
             </button>
@@ -94,32 +101,34 @@ export default function PaymentForm({ vendor, onPaymentAdded }: PaymentFormProps
         </div>
       </div>
 
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">
           Payment Method
         </label>
         <div className="grid grid-cols-3 gap-2">
-          {(['card', 'cash', 'other'] as const).map((method) => (
-            <button
-              key={method}
-              type="button"
-              onClick={() => setPaymentMethod(method)}
-              className={`px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                paymentMethod === method
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-              }`}
-            >
-              {method === 'card' && 'Card'}
-              {method === 'cash' && 'Cash'}
-              {method === 'other' && 'Other'}
-            </button>
-          ))}
+          {paymentMethods.map((method) => {
+            const Icon = method.icon
+            return (
+              <button
+                key={method.id}
+                type="button"
+                onClick={() => setPaymentMethod(method.id)}
+                className={`flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl transition-all ${
+                  paymentMethod === method.id
+                    ? 'btn-primary'
+                    : 'btn-secondary'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-sm">{method.label}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">
           Description (optional)
         </label>
         <input
@@ -127,14 +136,14 @@ export default function PaymentForm({ vendor, onPaymentAdded }: PaymentFormProps
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="e.g., Customer name, product sold"
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-4 py-3 glass-input"
         />
       </div>
 
       <button
         type="submit"
         disabled={loading || !amount}
-        className="w-full py-4 px-6 text-xl font-bold text-white bg-green-600 hover:bg-green-700 disabled:bg-gray-400 rounded-lg transition-colors"
+        className="w-full py-4 px-6 text-xl font-bold btn-success disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Processing...' : `Record $${amount || '0.00'} Payment`}
       </button>

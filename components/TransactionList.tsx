@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Transaction, Vendor } from '@/lib/database.types'
 import { supabase } from '@/lib/supabase'
+import { EditIcon, TrashIcon, CreditCardIcon, CashIcon, DotsIcon, XIcon, ClockIcon } from '@/components/Icons'
 
 interface TransactionListProps {
   transactions: Transaction[]
@@ -89,10 +90,24 @@ export default function TransactionList({
 
   const totalAmount = filteredTransactions.reduce((sum, t) => sum + Number(t.amount), 0)
 
+  const PaymentMethodIcon = ({ method }: { method: string }) => {
+    switch (method) {
+      case 'card': return <CreditCardIcon className="w-3.5 h-3.5" />
+      case 'cash': return <CashIcon className="w-3.5 h-3.5" />
+      default: return <DotsIcon className="w-3.5 h-3.5" />
+    }
+  }
+
+  const paymentMethods = [
+    { id: 'card' as const, label: 'Card', icon: CreditCardIcon },
+    { id: 'cash' as const, label: 'Cash', icon: CashIcon },
+    { id: 'other' as const, label: 'Other', icon: DotsIcon },
+  ]
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">
+        <h2 className="text-lg font-semibold text-foreground">
           Recent Transactions
           {selectedVendorId && (
             <span className="text-sm font-normal text-gray-500 ml-2">
@@ -100,64 +115,64 @@ export default function TransactionList({
             </span>
           )}
         </h2>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">Total</p>
-          <p className="text-xl font-bold text-green-600">${totalAmount.toFixed(2)}</p>
+        <div className="text-right glass-card px-3 py-2">
+          <p className="text-xs text-gray-500">Total</p>
+          <p className="text-xl font-bold font-number text-gradient-green">${totalAmount.toFixed(2)}</p>
         </div>
       </div>
 
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {filteredTransactions.length === 0 ? (
-          <p className="text-gray-500 text-center py-4">No transactions yet</p>
+          <p className="text-gray-500 text-center py-8">No transactions yet</p>
         ) : (
           filteredTransactions.map((transaction) => (
             <div
               key={transaction.id}
-              className="flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm"
+              className="flex items-center justify-between p-4 glass-card"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg text-green-600">
+                  <span className="text-xl font-bold font-number text-gradient-green">
                     ${Number(transaction.amount).toFixed(2)}
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  <span className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg ${
                     transaction.payment_method === 'card'
-                      ? 'bg-blue-100 text-blue-700'
+                      ? 'badge-card'
                       : transaction.payment_method === 'cash'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-700'
+                      ? 'badge-cash'
+                      : 'badge-other'
                   }`}>
+                    <PaymentMethodIcon method={transaction.payment_method} />
                     {transaction.payment_method}
                   </span>
                 </div>
                 {!selectedVendorId && (
-                  <p className="text-sm font-medium text-gray-700">
+                  <p className="text-sm font-medium text-foreground mt-0.5">
                     {getVendorName(transaction.vendor_id)}
                   </p>
                 )}
                 {transaction.description && (
                   <p className="text-sm text-gray-500 truncate">{transaction.description}</p>
                 )}
-                <p className="text-xs text-gray-400">{formatDate(transaction.created_at)}</p>
+                <p className="flex items-center gap-1 text-xs text-gray-400 mt-1">
+                  <ClockIcon className="w-3 h-3" />
+                  {formatDate(transaction.created_at)}
+                </p>
               </div>
-              <div className="flex items-center gap-1 ml-2">
+              <div className="flex items-center gap-1 ml-3">
                 <button
                   onClick={() => openEdit(transaction)}
-                  className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded"
+                  className="p-2 btn-secondary rounded-xl"
                   title="Edit"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
+                  <EditIcon className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(transaction)}
-                  className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                  className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
                   title="Delete"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                  <TrashIcon className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -167,13 +182,21 @@ export default function TransactionList({
 
       {/* Edit Modal */}
       {editingTransaction && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Edit Transaction</h3>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="glass-card w-full max-w-md bg-white dark:bg-gray-900 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-foreground">Edit Transaction</h3>
+              <button
+                onClick={() => setEditingTransaction(null)}
+                className="p-2 btn-secondary rounded-xl"
+              >
+                <XIcon className="w-5 h-5" />
+              </button>
+            </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                   Amount ($)
                 </label>
                 <input
@@ -182,34 +205,38 @@ export default function TransactionList({
                   min="0"
                   value={editAmount}
                   onChange={(e) => setEditAmount(e.target.value)}
-                  className="w-full px-4 py-2 text-xl font-bold border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center"
+                  className="w-full px-4 py-3 text-xl font-bold font-number glass-input text-center"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
                   Payment Method
                 </label>
                 <div className="grid grid-cols-3 gap-2">
-                  {(['card', 'cash', 'other'] as const).map((method) => (
-                    <button
-                      key={method}
-                      type="button"
-                      onClick={() => setEditPaymentMethod(method)}
-                      className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                        editPaymentMethod === method
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      {method.charAt(0).toUpperCase() + method.slice(1)}
-                    </button>
-                  ))}
+                  {paymentMethods.map((method) => {
+                    const Icon = method.icon
+                    return (
+                      <button
+                        key={method.id}
+                        type="button"
+                        onClick={() => setEditPaymentMethod(method.id)}
+                        className={`flex flex-col items-center gap-1.5 px-3 py-2 rounded-xl transition-all ${
+                          editPaymentMethod === method.id
+                            ? 'btn-primary'
+                            : 'btn-secondary'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span className="text-xs">{method.label}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                   Description
                 </label>
                 <input
@@ -217,22 +244,22 @@ export default function TransactionList({
                   value={editDescription}
                   onChange={(e) => setEditDescription(e.target.value)}
                   placeholder="Optional description"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-3 glass-input"
                 />
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setEditingTransaction(null)}
-                  className="flex-1 py-2 px-4 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="flex-1 py-3 px-4 btn-secondary"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpdate}
                   disabled={loading}
-                  className="flex-1 py-2 px-4 text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 rounded-lg transition-colors"
+                  className="flex-1 py-3 px-4 btn-primary disabled:opacity-50"
                 >
                   {loading ? 'Saving...' : 'Save Changes'}
                 </button>

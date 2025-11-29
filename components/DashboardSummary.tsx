@@ -1,6 +1,7 @@
 'use client'
 
 import { Transaction, Vendor } from '@/lib/database.types'
+import { CreditCardIcon, CashIcon, ListIcon, StoreIcon } from '@/components/Icons'
 
 interface DashboardSummaryProps {
   transactions: Transaction[]
@@ -25,37 +26,73 @@ export default function DashboardSummary({ transactions, vendors }: DashboardSum
   return (
     <div className="space-y-6">
       {/* Main Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 text-white">
-          <p className="text-green-100 text-sm">Total Collected</p>
-          <p className="text-3xl font-bold">${totalAmount.toFixed(2)}</p>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2 glass-card p-5 bg-gradient-to-br from-[#43FF52]/20 to-[#43FF52]/5">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 rounded-xl bg-[#43FF52]/20">
+              <CreditCardIcon className="w-5 h-5 text-[#43FF52]" />
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Total Collected</p>
+          </div>
+          <p className="text-4xl font-bold font-number text-gradient-green">${totalAmount.toFixed(2)}</p>
         </div>
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white">
-          <p className="text-blue-100 text-sm">Card Payments</p>
-          <p className="text-2xl font-bold">${cardTotal.toFixed(2)}</p>
+
+        <div className="glass-card p-4 bg-gradient-to-br from-[#B34AFF]/20 to-[#B34AFF]/5">
+          <div className="flex items-center gap-2 mb-2">
+            <CreditCardIcon className="w-4 h-4 text-[#B34AFF]" />
+            <p className="text-xs text-gray-500">Card</p>
+          </div>
+          <p className="text-2xl font-bold font-number text-gradient-purple">${cardTotal.toFixed(2)}</p>
         </div>
-        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-4 text-white">
-          <p className="text-emerald-100 text-sm">Cash Payments</p>
-          <p className="text-2xl font-bold">${cashTotal.toFixed(2)}</p>
+
+        <div className="glass-card p-4 bg-gradient-to-br from-[#43FF52]/20 to-[#43FF52]/5">
+          <div className="flex items-center gap-2 mb-2">
+            <CashIcon className="w-4 h-4 text-[#43FF52]" />
+            <p className="text-xs text-gray-500">Cash</p>
+          </div>
+          <p className="text-2xl font-bold font-number text-gradient-green">${cashTotal.toFixed(2)}</p>
         </div>
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white">
-          <p className="text-purple-100 text-sm">Transactions</p>
-          <p className="text-2xl font-bold">{transactions.length}</p>
+
+        <div className="glass-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <ListIcon className="w-4 h-4 text-gray-500" />
+            <p className="text-xs text-gray-500">Transactions</p>
+          </div>
+          <p className="text-2xl font-bold font-number text-foreground">{transactions.length}</p>
+        </div>
+
+        <div className="glass-card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <StoreIcon className="w-4 h-4 text-gray-500" />
+            <p className="text-xs text-gray-500">Vendors</p>
+          </div>
+          <p className="text-2xl font-bold font-number text-foreground">{vendors.length}</p>
         </div>
       </div>
 
       {/* Vendor Breakdown */}
       {vendorTotals.length > 0 && (
-        <div className="bg-white rounded-xl border p-4">
-          <h3 className="text-lg font-semibold text-gray-800 mb-3">Vendor Breakdown</h3>
-          <div className="space-y-2">
-            {vendorTotals.map(({ vendor, total, count }) => (
-              <div key={vendor.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                <div>
-                  <p className="font-medium text-gray-800">{vendor.name}</p>
-                  <p className="text-sm text-gray-500">{count} transaction{count !== 1 ? 's' : ''}</p>
+        <div className="glass-card p-5">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Vendor Breakdown</h3>
+          <div className="space-y-3">
+            {vendorTotals.map(({ vendor, total, count }, index) => (
+              <div key={vendor.id} className="flex items-center justify-between py-3 border-b border-gray-200/50 dark:border-gray-700/50 last:border-0">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold ${
+                    index === 0
+                      ? 'bg-[#43FF52]/20 text-[#43FF52]'
+                      : index === 1
+                      ? 'bg-[#B34AFF]/20 text-[#B34AFF]'
+                      : 'bg-gray-200/50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-400'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">{vendor.name}</p>
+                    <p className="text-xs text-gray-500">{count} transaction{count !== 1 ? 's' : ''}</p>
+                  </div>
                 </div>
-                <p className="text-lg font-bold text-green-600">${total.toFixed(2)}</p>
+                <p className="text-xl font-bold font-number text-gradient-green">${total.toFixed(2)}</p>
               </div>
             ))}
           </div>
