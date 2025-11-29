@@ -182,7 +182,7 @@ export default function TransactionList({
 
       {/* Edit Modal */}
       {editingTransaction && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
           <div className="glass-card w-full max-w-md bg-white dark:bg-gray-900 p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-foreground">Edit Transaction</h3>

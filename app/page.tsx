@@ -9,7 +9,7 @@ import PaymentForm from '@/components/PaymentForm'
 import VendorManager from '@/components/VendorManager'
 import TransactionList from '@/components/TransactionList'
 import DashboardSummary from '@/components/DashboardSummary'
-import { CreditCardIcon, StoreIcon, ListIcon, ChartIcon } from '@/components/Icons'
+import { CreditCardIcon, StoreIcon, ListIcon, ChartIcon, RefreshIcon } from '@/components/Icons'
 
 type Tab = 'payment' | 'vendors' | 'transactions' | 'summary'
 
@@ -19,6 +19,7 @@ export default function Home() {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('payment')
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [lastPayment, setLastPayment] = useState<{ amount: number; vendor: string } | null>(null)
 
   const fetchVendors = useCallback(async () => {
@@ -43,19 +44,63 @@ export default function Home() {
     setLoading(false)
   }, [fetchVendors, fetchTransactions])
 
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    await fetchAll()
+    setRefreshing(false)
+  }
+
   useEffect(() => {
     fetchAll()
 
+    // Subscribe to realtime updates for vendors
     const vendorsChannel = supabase
-      .channel('vendors-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vendors' }, () => {
+      .channel('vendors-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'vendors'
+      }, () => {
+        fetchVendors()
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'vendors'
+      }, () => {
+        fetchVendors()
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'vendors'
+      }, () => {
         fetchVendors()
       })
       .subscribe()
 
+    // Subscribe to realtime updates for transactions
     const transactionsChannel = supabase
-      .channel('transactions-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+      .channel('transactions-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'transactions'
+      }, () => {
+        fetchTransactions()
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'transactions'
+      }, () => {
+        fetchTransactions()
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'transactions'
+      }, () => {
         fetchTransactions()
       })
       .subscribe()
@@ -110,11 +155,21 @@ export default function Home() {
               <p className="text-xs text-gray-500">Market POS System</p>
             </div>
           </div>
-          <div className="text-right glass-card px-4 py-2">
-            <p className="text-xs text-gray-500">Today&apos;s Total</p>
-            <p className="text-xl font-bold font-number text-gradient-green">
-              ${transactions.reduce((sum, t) => sum + Number(t.amount), 0).toFixed(2)}
-            </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className={`p-2 btn-secondary rounded-xl transition-all ${refreshing ? 'animate-spin' : ''}`}
+              title="Refresh data"
+            >
+              <RefreshIcon className="w-5 h-5" />
+            </button>
+            <div className="text-right glass-card px-4 py-2">
+              <p className="text-xs text-gray-500">Today&apos;s Total</p>
+              <p className="text-xl font-bold font-number text-gradient-green">
+                ${transactions.reduce((sum, t) => sum + Number(t.amount), 0).toFixed(2)}
+              </p>
+            </div>
           </div>
         </div>
       </header>

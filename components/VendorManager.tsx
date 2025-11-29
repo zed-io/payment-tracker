@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Vendor } from '@/lib/database.types'
 import { supabase } from '@/lib/supabase'
-import { PlusIcon, EditIcon, TrashIcon, ShareIcon, CheckIcon, XIcon } from '@/components/Icons'
+import { PlusIcon, EditIcon, TrashIcon, ShareIcon, CheckIcon, XIcon, WhatsAppIcon, TelegramIcon, SmsIcon, CopyIcon, EmailIcon } from '@/components/Icons'
 
 interface VendorManagerProps {
   vendors: Vendor[]
@@ -12,6 +12,7 @@ interface VendorManagerProps {
 
 export default function VendorManager({ vendors, onVendorsChange }: VendorManagerProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [shareModalVendor, setShareModalVendor] = useState<Vendor | null>(null)
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -19,7 +20,7 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
   const [contactPhone, setContactPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const resetForm = () => {
     setName('')
@@ -113,11 +114,39 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
     onVendorsChange()
   }
 
-  const copyShareLink = async (vendor: Vendor) => {
-    const link = `${window.location.origin}/vendor/${vendor.share_token}`
-    await navigator.clipboard.writeText(link)
-    setCopiedId(vendor.id)
-    setTimeout(() => setCopiedId(null), 2000)
+  const getShareLink = (vendor: Vendor) => {
+    return `${window.location.origin}/vendor/${vendor.share_token}`
+  }
+
+  const copyToClipboard = async (vendor: Vendor) => {
+    await navigator.clipboard.writeText(getShareLink(vendor))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  const shareViaWhatsApp = (vendor: Vendor) => {
+    const link = getShareLink(vendor)
+    const text = `View your payment dashboard for ${vendor.name}: ${link}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  }
+
+  const shareViaTelegram = (vendor: Vendor) => {
+    const link = getShareLink(vendor)
+    const text = `View your payment dashboard for ${vendor.name}`
+    window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`, '_blank')
+  }
+
+  const shareViaSms = (vendor: Vendor) => {
+    const link = getShareLink(vendor)
+    const text = `View your payment dashboard for ${vendor.name}: ${link}`
+    window.open(`sms:?body=${encodeURIComponent(text)}`, '_blank')
+  }
+
+  const shareViaEmail = (vendor: Vendor) => {
+    const link = getShareLink(vendor)
+    const subject = `Payment Dashboard - ${vendor.name}`
+    const body = `Hi,\n\nYou can view your real-time payment dashboard here:\n${link}\n\nThis link will show you all payments as they come in.\n\nBest regards`
+    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank')
   }
 
   return (
@@ -150,15 +179,11 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
               </div>
               <div className="flex items-center gap-1 ml-3">
                 <button
-                  onClick={() => copyShareLink(vendor)}
-                  className={`p-2 rounded-xl transition-all ${
-                    copiedId === vendor.id
-                      ? 'bg-[#43FF52]/20 text-[#43FF52]'
-                      : 'btn-secondary'
-                  }`}
-                  title="Copy share link"
+                  onClick={() => setShareModalVendor(vendor)}
+                  className="p-2 btn-secondary rounded-xl"
+                  title="Share link"
                 >
-                  {copiedId === vendor.id ? <CheckIcon className="w-4 h-4" /> : <ShareIcon className="w-4 h-4" />}
+                  <ShareIcon className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => openEdit(vendor)}
@@ -180,10 +205,89 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
         )}
       </div>
 
-      {/* Modal */}
+      {/* Share Modal */}
+      {shareModalVendor && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="glass-card w-full max-w-sm bg-white dark:bg-gray-900 overflow-hidden">
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-foreground">Share Dashboard</h3>
+                <button
+                  onClick={() => {
+                    setShareModalVendor(null)
+                    setCopied(false)
+                  }}
+                  className="p-2 btn-secondary rounded-xl"
+                >
+                  <XIcon className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-500 mb-4">
+                Share the live payment dashboard with <span className="font-medium text-foreground">{shareModalVendor.name}</span>
+              </p>
+
+              {/* Share Options */}
+              <div className="grid grid-cols-4 gap-3 mb-5">
+                <button
+                  onClick={() => shareViaWhatsApp(shareModalVendor)}
+                  className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-[#25D366]/10 hover:bg-[#25D366]/20 transition-colors"
+                >
+                  <WhatsAppIcon className="w-6 h-6 text-[#25D366]" />
+                  <span className="text-xs text-gray-600 dark:text-gray-400">WhatsApp</span>
+                </button>
+
+                <button
+                  onClick={() => shareViaTelegram(shareModalVendor)}
+                  className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-[#0088cc]/10 hover:bg-[#0088cc]/20 transition-colors"
+                >
+                  <TelegramIcon className="w-6 h-6 text-[#0088cc]" />
+                  <span className="text-xs text-gray-600 dark:text-gray-400">Telegram</span>
+                </button>
+
+                <button
+                  onClick={() => shareViaSms(shareModalVendor)}
+                  className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-[#B34AFF]/10 hover:bg-[#B34AFF]/20 transition-colors"
+                >
+                  <SmsIcon className="w-6 h-6 text-[#B34AFF]" />
+                  <span className="text-xs text-gray-600 dark:text-gray-400">SMS</span>
+                </button>
+
+                <button
+                  onClick={() => shareViaEmail(shareModalVendor)}
+                  className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-gray-500/10 hover:bg-gray-500/20 transition-colors"
+                >
+                  <EmailIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                  <span className="text-xs text-gray-600 dark:text-gray-400">Email</span>
+                </button>
+              </div>
+
+              {/* Copy Link */}
+              <div className="flex gap-2">
+                <div className="flex-1 px-3 py-2 glass-input text-sm truncate text-gray-600 dark:text-gray-400">
+                  {getShareLink(shareModalVendor)}
+                </div>
+                <button
+                  onClick={() => copyToClipboard(shareModalVendor)}
+                  className={`px-4 py-2 rounded-xl flex items-center gap-2 transition-all ${
+                    copied
+                      ? 'bg-[#43FF52]/20 text-[#43FF52]'
+                      : 'btn-primary'
+                  }`}
+                >
+                  {copied ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Vendor Modal */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="glass-card w-full max-w-md bg-white dark:bg-gray-900">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="glass-card w-full max-w-md max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-foreground">
@@ -218,6 +322,7 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
                     placeholder="e.g., Fresh Produce Co."
                     className="w-full px-4 py-3 glass-input"
                     required
+                    autoFocus
                   />
                 </div>
 
