@@ -5,14 +5,13 @@ import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { Vendor, Transaction, PaymentRequest } from '@/lib/database.types'
 import VendorSelect from '@/components/VendorSelect'
-import PaymentForm from '@/components/PaymentForm'
 import VendorManager from '@/components/VendorManager'
 import TransactionList from '@/components/TransactionList'
 import DashboardSummary from '@/components/DashboardSummary'
-import PaymentRequests from '@/components/PaymentRequests'
-import { CreditCardIcon, StoreIcon, ListIcon, ChartIcon, RefreshIcon, BellIcon } from '@/components/Icons'
+import BatchPayment from '@/components/BatchPayment'
+import { CreditCardIcon, StoreIcon, ListIcon, ChartIcon, RefreshIcon } from '@/components/Icons'
 
-type Tab = 'payment' | 'vendors' | 'transactions' | 'summary' | 'requests'
+type Tab = 'payment' | 'vendors' | 'transactions' | 'summary'
 
 export default function Home() {
   const [vendors, setVendors] = useState<Vendor[]>([])
@@ -149,64 +148,17 @@ export default function Home() {
     }
   }, [fetchAll, fetchVendors, fetchTransactions, fetchPaymentRequests])
 
-  const handlePaymentAdded = () => {
-    if (selectedVendor) {
-      setLastPayment({ amount: 0, vendor: selectedVendor.name })
-      setTimeout(() => setLastPayment(null), 3000)
-    }
-    fetchTransactions()
-  }
-
-  const handleProcessPaymentRequest = async (
-    request: PaymentRequest,
-    paymentMethod: 'card' | 'cash' | 'other'
-  ) => {
-    // Create the transaction
-    const { data: transactionData, error: transactionError } = await supabase
-      .from('transactions')
-      .insert({
-        vendor_id: request.vendor_id,
-        amount: request.amount,
-        description: `Payment from ${request.payer_name}`,
-        payment_method: paymentMethod,
-      })
-      .select()
-      .single()
-
-    if (transactionError) {
-      alert('Failed to create transaction')
-      return
-    }
-
-    // Update the payment request status
-    const { error: updateError } = await supabase
-      .from('payment_requests')
-      .update({
-        status: 'completed',
-        processed_transaction_id: transactionData.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', request.id)
-
-    if (updateError) {
-      alert('Transaction created but failed to update request status')
-    }
-
-    // Refresh data
+  const handleBatchComplete = () => {
     fetchTransactions()
     fetchPaymentRequests()
-
-    // Show success toast
-    const vendorName = vendors.find(v => v.id === request.vendor_id)?.name || 'Unknown'
-    setLastPayment({ amount: request.amount, vendor: vendorName })
+    setLastPayment({ amount: 0, vendor: 'Batch' })
     setTimeout(() => setLastPayment(null), 3000)
   }
 
   const pendingRequestsCount = paymentRequests.filter(r => r.status === 'pending').length
 
   const tabs = [
-    { id: 'payment' as Tab, label: 'Payment', icon: CreditCardIcon },
-    { id: 'requests' as Tab, label: 'Requests', icon: BellIcon, badge: pendingRequestsCount },
+    { id: 'payment' as Tab, label: 'Payment', icon: CreditCardIcon, badge: pendingRequestsCount },
     { id: 'vendors' as Tab, label: 'Vendors', icon: StoreIcon },
     { id: 'transactions' as Tab, label: 'History', icon: ListIcon },
     { id: 'summary' as Tab, label: 'Summary', icon: ChartIcon },
@@ -283,49 +235,11 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              <div className="glass-card p-5 space-y-5">
-                <VendorSelect
-                  vendors={vendors}
-                  selectedVendor={selectedVendor}
-                  onSelect={setSelectedVendor}
-                />
-
-                {selectedVendor ? (
-                  <PaymentForm
-                    vendor={selectedVendor}
-                    onPaymentAdded={handlePaymentAdded}
-                  />
-                ) : (
-                  <div className="text-center py-10 text-gray-400">
-                    <CreditCardIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    Select a vendor above to record a payment
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Quick Stats for selected vendor */}
-            {selectedVendor && (
-              <div className="glass-card p-5 bg-gradient-to-br from-[#B34AFF]/10 to-[#43FF52]/10">
-                <h3 className="font-semibold text-foreground mb-3">{selectedVendor.name} Today</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="glass-card p-4">
-                    <p className="text-sm text-gray-500">Total</p>
-                    <p className="text-3xl font-bold font-number text-gradient-green">
-                      ${transactions
-                        .filter(t => t.vendor_id === selectedVendor.id)
-                        .reduce((sum, t) => sum + Number(t.amount), 0)
-                        .toFixed(2)}
-                    </p>
-                  </div>
-                  <div className="glass-card p-4">
-                    <p className="text-sm text-gray-500">Transactions</p>
-                    <p className="text-3xl font-bold font-number text-gradient-purple">
-                      {transactions.filter(t => t.vendor_id === selectedVendor.id).length}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <BatchPayment
+                requests={paymentRequests}
+                vendors={vendors}
+                onComplete={handleBatchComplete}
+              />
             )}
           </div>
         )}
@@ -370,17 +284,6 @@ export default function Home() {
             transactions={transactions}
             vendors={vendors}
           />
-        )}
-
-        {activeTab === 'requests' && (
-          <div className="glass-card p-5">
-            <PaymentRequests
-              requests={paymentRequests}
-              vendors={vendors}
-              onRequestsChange={fetchPaymentRequests}
-              onProcessPayment={handleProcessPaymentRequest}
-            />
-          </div>
         )}
       </main>
 
