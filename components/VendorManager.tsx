@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Vendor } from '@/lib/database.types'
 import { supabase } from '@/lib/supabase'
-import { PlusIcon, EditIcon, TrashIcon, ShareIcon, CheckIcon, XIcon, WhatsAppIcon, TelegramIcon, SmsIcon, CopyIcon, EmailIcon } from '@/components/Icons'
+import { PlusIcon, EditIcon, TrashIcon, ShareIcon, CheckIcon, XIcon, WhatsAppIcon, TelegramIcon, SmsIcon, CopyIcon, EmailIcon, DotsIcon } from '@/components/Icons'
 
 interface VendorManagerProps {
   vendors: Vendor[]
@@ -124,7 +124,12 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleShare = async (vendor: Vendor) => {
+  const handleShare = (vendor: Vendor) => {
+    // Always show the share modal with all options
+    setShareModalVendor(vendor)
+  }
+
+  const handleNativeShare = async (vendor: Vendor) => {
     const link = getShareLink(vendor)
     const shareData = {
       title: `${vendor.name} - Payment Dashboard`,
@@ -132,20 +137,16 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
       url: link
     }
 
-    // Check if native share is available (iOS/Android)
-    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
-      try {
-        await navigator.share(shareData)
-      } catch (err) {
-        // User cancelled or error - fall back to modal
-        if ((err as Error).name !== 'AbortError') {
-          setShareModalVendor(vendor)
-        }
-      }
-    } else {
-      // Fallback to custom share modal for desktop
-      setShareModalVendor(vendor)
+    try {
+      await navigator.share(shareData)
+    } catch (err) {
+      // User cancelled - do nothing
+      console.log('Share cancelled')
     }
+  }
+
+  const canNativeShare = () => {
+    return typeof navigator !== 'undefined' && !!navigator.share && !!navigator.canShare
   }
 
   const shareViaWhatsApp = (vendor: Vendor) => {
@@ -250,6 +251,17 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
               <p className="text-sm text-gray-500 mb-4">
                 Share the live payment dashboard with <span className="font-medium text-foreground">{shareModalVendor.name}</span>
               </p>
+
+              {/* Native Share Button (if available) */}
+              {canNativeShare() && (
+                <button
+                  onClick={() => handleNativeShare(shareModalVendor)}
+                  className="w-full mb-4 py-3 btn-primary flex items-center justify-center gap-2"
+                >
+                  <ShareIcon className="w-5 h-5" />
+                  Share via Apps
+                </button>
+              )}
 
               {/* Share Options */}
               <div className="grid grid-cols-4 gap-3 mb-5">
