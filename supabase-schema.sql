@@ -59,7 +59,41 @@ CREATE POLICY "Allow public delete transactions" ON transactions
 ALTER PUBLICATION supabase_realtime ADD TABLE vendors;
 ALTER PUBLICATION supabase_realtime ADD TABLE transactions;
 
+-- Payment requests table (for vendor-initiated payment requests)
+CREATE TABLE payment_requests (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  vendor_id UUID NOT NULL REFERENCES vendors(id) ON DELETE CASCADE,
+  amount DECIMAL(10, 2) NOT NULL,
+  payer_name TEXT NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled')),
+  processed_transaction_id UUID REFERENCES transactions(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Enable Row Level Security for payment_requests
+ALTER TABLE payment_requests ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for payment_requests
+CREATE POLICY "Allow public read payment_requests" ON payment_requests
+  FOR SELECT USING (true);
+
+CREATE POLICY "Allow public insert payment_requests" ON payment_requests
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow public update payment_requests" ON payment_requests
+  FOR UPDATE USING (true);
+
+CREATE POLICY "Allow public delete payment_requests" ON payment_requests
+  FOR DELETE USING (true);
+
+-- Enable realtime for payment_requests
+ALTER PUBLICATION supabase_realtime ADD TABLE payment_requests;
+
 -- Create indexes for better performance
 CREATE INDEX idx_transactions_vendor_id ON transactions(vendor_id);
 CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
 CREATE INDEX idx_vendors_share_token ON vendors(share_token);
+CREATE INDEX idx_payment_requests_vendor_id ON payment_requests(vendor_id);
+CREATE INDEX idx_payment_requests_status ON payment_requests(status);
+CREATE INDEX idx_payment_requests_created_at ON payment_requests(created_at DESC);

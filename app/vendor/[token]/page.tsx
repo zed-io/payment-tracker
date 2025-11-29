@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback, use } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
-import { Vendor, Transaction } from '@/lib/database.types'
-import { CreditCardIcon, CashIcon, DotsIcon, WifiIcon, ClockIcon } from '@/components/Icons'
+import { Vendor, Transaction, PaymentRequest } from '@/lib/database.types'
+import { CreditCardIcon, CashIcon, DotsIcon, WifiIcon, ClockIcon, PlusIcon } from '@/components/Icons'
+import PaymentRequestForm from '@/components/PaymentRequestForm'
 
 interface Props {
   params: Promise<{ token: string }>
@@ -14,8 +15,10 @@ export default function VendorPublicView({ params }: Props) {
   const resolvedParams = use(params)
   const [vendor, setVendor] = useState<Vendor | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showRequestForm, setShowRequestForm] = useState(false)
 
   const fetchVendor = useCallback(async () => {
     const { data, error: fetchError } = await supabase
@@ -45,6 +48,18 @@ export default function VendorPublicView({ params }: Props) {
     if (data) setTransactions(data)
   }, [vendor])
 
+  const fetchPaymentRequests = useCallback(async () => {
+    if (!vendor) return
+
+    const { data } = await supabase
+      .from('payment_requests')
+      .select('*')
+      .eq('vendor_id', vendor.id)
+      .order('created_at', { ascending: false })
+
+    if (data) setPaymentRequests(data)
+  }, [vendor])
+
   useEffect(() => {
     fetchVendor()
   }, [fetchVendor])
@@ -52,9 +67,10 @@ export default function VendorPublicView({ params }: Props) {
   useEffect(() => {
     if (vendor) {
       fetchTransactions()
+      fetchPaymentRequests()
       setLoading(false)
 
-      const channel = supabase
+      const transactionsChannel = supabase
         .channel(`vendor-${vendor.id}-transactions`)
         .on(
           'postgres_changes',
@@ -70,11 +86,28 @@ export default function VendorPublicView({ params }: Props) {
         )
         .subscribe()
 
+      const requestsChannel = supabase
+        .channel(`vendor-${vendor.id}-requests`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'payment_requests',
+            filter: `vendor_id=eq.${vendor.id}`
+          },
+          () => {
+            fetchPaymentRequests()
+          }
+        )
+        .subscribe()
+
       return () => {
-        supabase.removeChannel(channel)
+        supabase.removeChannel(transactionsChannel)
+        supabase.removeChannel(requestsChannel)
       }
     }
-  }, [vendor, fetchTransactions])
+  }, [vendor, fetchTransactions, fetchPaymentRequests])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('en-US', {
@@ -188,6 +221,70 @@ export default function VendorPublicView({ params }: Props) {
             </p>
           </div>
         </div>
+
+        {/* Request Payment Button */}
+        <button
+          onClick={() => setShowRequestForm(true)}
+          className="w-full py-4 btn-primary flex items-center justify-center gap-2 text-lg"
+        >
+          <PlusIcon className="w-6 h-6" />
+          Request Payment
+        </button>
+
+        {/* Payment Request Modal */}
+        {showRequestForm && vendor && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="w-full max-w-md">
+              <PaymentRequestForm
+                vendor={vendor}
+                onRequestSubmitted={() => {
+                  fetchPaymentRequests()
+                  setShowRequestForm(false)
+                }}
+              />
+              <button
+                onClick={() => setShowRequestForm(false)}
+                className="w-full mt-3 py-3 btn-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Pending Requests */}
+        {paymentRequests.filter(r => r.status === 'pending').length > 0 && (
+          <div className="glass-card bg-gradient-to-br from-[#B34AFF]/10 to-[#B34AFF]/5">
+            <div className="p-4 border-b border-gray-200/50 dark:border-gray-700/50">
+              <h2 className="text-lg font-semibold text-foreground">Pending Requests</h2>
+              <p className="text-sm text-gray-500">Waiting to be processed by admin</p>
+            </div>
+            <div className="divide-y divide-gray-200/50 dark:divide-gray-700/50">
+              {paymentRequests
+                .filter(r => r.status === 'pending')
+                .map((request) => (
+                  <div
+                    key={request.id}
+                    className="p-4 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="text-xl font-bold font-number text-gradient-purple">
+                        ${Number(request.amount).toFixed(2)}
+                      </p>
+                      <p className="text-sm text-foreground font-medium">{request.payer_name}</p>
+                      <p className="flex items-center gap-1 text-xs text-gray-400 mt-1">
+                        <ClockIcon className="w-3 h-3" />
+                        {formatDate(request.created_at)}
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs font-medium">
+                      Pending
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
 
         {/* Recent Transactions */}
         <div className="glass-card">

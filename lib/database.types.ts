@@ -80,6 +80,54 @@ export interface Database {
           }
         ]
       }
+      payment_requests: {
+        Row: {
+          id: string
+          vendor_id: string
+          amount: number
+          payer_name: string
+          status: 'pending' | 'completed' | 'cancelled'
+          processed_transaction_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          vendor_id: string
+          amount: number
+          payer_name: string
+          status?: 'pending' | 'completed' | 'cancelled'
+          processed_transaction_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          vendor_id?: string
+          amount?: number
+          payer_name?: string
+          status?: 'pending' | 'completed' | 'cancelled'
+          processed_transaction_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_requests_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_requests_processed_transaction_id_fkey"
+            columns: ["processed_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -100,3 +148,5 @@ export type Vendor = Database['public']['Tables']['vendors']['Row']
 export type VendorInsert = Database['public']['Tables']['vendors']['Insert']
 export type Transaction = Database['public']['Tables']['transactions']['Row']
 export type TransactionInsert = Database['public']['Tables']['transactions']['Insert']
+export type PaymentRequest = Database['public']['Tables']['payment_requests']['Row']
+export type PaymentRequestInsert = Database['public']['Tables']['payment_requests']['Insert']

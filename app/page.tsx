@@ -3,19 +3,21 @@
 import { useEffect, useState, useCallback } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
-import { Vendor, Transaction } from '@/lib/database.types'
+import { Vendor, Transaction, PaymentRequest } from '@/lib/database.types'
 import VendorSelect from '@/components/VendorSelect'
 import PaymentForm from '@/components/PaymentForm'
 import VendorManager from '@/components/VendorManager'
 import TransactionList from '@/components/TransactionList'
 import DashboardSummary from '@/components/DashboardSummary'
-import { CreditCardIcon, StoreIcon, ListIcon, ChartIcon, RefreshIcon } from '@/components/Icons'
+import PaymentRequests from '@/components/PaymentRequests'
+import { CreditCardIcon, StoreIcon, ListIcon, ChartIcon, RefreshIcon, BellIcon } from '@/components/Icons'
 
-type Tab = 'payment' | 'vendors' | 'transactions' | 'summary'
+type Tab = 'payment' | 'vendors' | 'transactions' | 'summary' | 'requests'
 
 export default function Home() {
   const [vendors, setVendors] = useState<Vendor[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([])
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('payment')
   const [loading, setLoading] = useState(true)
@@ -39,10 +41,19 @@ export default function Home() {
     if (data) setTransactions(data)
   }, [])
 
+  const fetchPaymentRequests = useCallback(async () => {
+    const { data } = await supabase
+      .from('payment_requests')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (data) setPaymentRequests(data)
+  }, [])
+
   const fetchAll = useCallback(async () => {
-    await Promise.all([fetchVendors(), fetchTransactions()])
+    await Promise.all([fetchVendors(), fetchTransactions(), fetchPaymentRequests()])
     setLoading(false)
-  }, [fetchVendors, fetchTransactions])
+  }, [fetchVendors, fetchTransactions, fetchPaymentRequests])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -105,11 +116,38 @@ export default function Home() {
       })
       .subscribe()
 
+    // Subscribe to realtime updates for payment requests
+    const requestsChannel = supabase
+      .channel('requests-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'payment_requests'
+      }, () => {
+        fetchPaymentRequests()
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'payment_requests'
+      }, () => {
+        fetchPaymentRequests()
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'payment_requests'
+      }, () => {
+        fetchPaymentRequests()
+      })
+      .subscribe()
+
     return () => {
       supabase.removeChannel(vendorsChannel)
       supabase.removeChannel(transactionsChannel)
+      supabase.removeChannel(requestsChannel)
     }
-  }, [fetchAll, fetchVendors, fetchTransactions])
+  }, [fetchAll, fetchVendors, fetchTransactions, fetchPaymentRequests])
 
   const handlePaymentAdded = () => {
     if (selectedVendor) {
@@ -119,8 +157,56 @@ export default function Home() {
     fetchTransactions()
   }
 
+  const handleProcessPaymentRequest = async (
+    request: PaymentRequest,
+    paymentMethod: 'card' | 'cash' | 'other'
+  ) => {
+    // Create the transaction
+    const { data: transactionData, error: transactionError } = await supabase
+      .from('transactions')
+      .insert({
+        vendor_id: request.vendor_id,
+        amount: request.amount,
+        description: `Payment from ${request.payer_name}`,
+        payment_method: paymentMethod,
+      })
+      .select()
+      .single()
+
+    if (transactionError) {
+      alert('Failed to create transaction')
+      return
+    }
+
+    // Update the payment request status
+    const { error: updateError } = await supabase
+      .from('payment_requests')
+      .update({
+        status: 'completed',
+        processed_transaction_id: transactionData.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', request.id)
+
+    if (updateError) {
+      alert('Transaction created but failed to update request status')
+    }
+
+    // Refresh data
+    fetchTransactions()
+    fetchPaymentRequests()
+
+    // Show success toast
+    const vendorName = vendors.find(v => v.id === request.vendor_id)?.name || 'Unknown'
+    setLastPayment({ amount: request.amount, vendor: vendorName })
+    setTimeout(() => setLastPayment(null), 3000)
+  }
+
+  const pendingRequestsCount = paymentRequests.filter(r => r.status === 'pending').length
+
   const tabs = [
     { id: 'payment' as Tab, label: 'Payment', icon: CreditCardIcon },
+    { id: 'requests' as Tab, label: 'Requests', icon: BellIcon, badge: pendingRequestsCount },
     { id: 'vendors' as Tab, label: 'Vendors', icon: StoreIcon },
     { id: 'transactions' as Tab, label: 'History', icon: ListIcon },
     { id: 'summary' as Tab, label: 'Summary', icon: ChartIcon },
@@ -285,6 +371,17 @@ export default function Home() {
             vendors={vendors}
           />
         )}
+
+        {activeTab === 'requests' && (
+          <div className="glass-card p-5">
+            <PaymentRequests
+              requests={paymentRequests}
+              vendors={vendors}
+              onRequestsChange={fetchPaymentRequests}
+              onProcessPayment={handleProcessPaymentRequest}
+            />
+          </div>
+        )}
       </main>
 
       {/* Bottom Tab Navigation */}
@@ -294,17 +391,25 @@ export default function Home() {
             {tabs.map((tab) => {
               const Icon = tab.icon
               const isActive = activeTab === tab.id
+              const badge = 'badge' in tab ? (tab.badge ?? 0) : 0
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all ${
+                  className={`relative flex flex-col items-center gap-1 px-4 py-2 rounded-2xl transition-all ${
                     isActive
                       ? 'bg-[#B34AFF]/20 text-[#B34AFF]'
                       : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                   }`}
                 >
-                  <Icon className="w-6 h-6" />
+                  <div className="relative">
+                    <Icon className="w-6 h-6" />
+                    {badge > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {badge > 9 ? '9+' : badge}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs font-medium">{tab.label}</span>
                 </button>
               )
