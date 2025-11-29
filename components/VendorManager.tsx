@@ -124,6 +124,30 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleShare = async (vendor: Vendor) => {
+    const link = getShareLink(vendor)
+    const shareData = {
+      title: `${vendor.name} - Payment Dashboard`,
+      text: `View the live payment dashboard for ${vendor.name}`,
+      url: link
+    }
+
+    // Check if native share is available (iOS/Android)
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData)
+      } catch (err) {
+        // User cancelled or error - fall back to modal
+        if ((err as Error).name !== 'AbortError') {
+          setShareModalVendor(vendor)
+        }
+      }
+    } else {
+      // Fallback to custom share modal for desktop
+      setShareModalVendor(vendor)
+    }
+  }
+
   const shareViaWhatsApp = (vendor: Vendor) => {
     const link = getShareLink(vendor)
     const text = `View your payment dashboard for ${vendor.name}: ${link}`
@@ -179,7 +203,7 @@ export default function VendorManager({ vendors, onVendorsChange }: VendorManage
               </div>
               <div className="flex items-center gap-1 ml-3">
                 <button
-                  onClick={() => setShareModalVendor(vendor)}
+                  onClick={() => handleShare(vendor)}
                   className="p-2 btn-secondary rounded-xl"
                   title="Share link"
                 >
