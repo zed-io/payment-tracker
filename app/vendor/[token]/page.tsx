@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, use } from 'react'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 import { Vendor, Transaction, PaymentRequest } from '@/lib/database.types'
-import { CreditCardIcon, CashIcon, DotsIcon, WifiIcon, ClockIcon, PlusIcon } from '@/components/Icons'
+import { CreditCardIcon, CashIcon, DotsIcon, WifiIcon, ClockIcon, PlusIcon, TrashIcon } from '@/components/Icons'
 import PaymentRequestForm from '@/components/PaymentRequestForm'
 
 interface Props {
@@ -117,6 +117,17 @@ export default function VendorPublicView({ params }: Props) {
       minute: '2-digit',
       hour12: true
     })
+  }
+
+  const deleteRequest = async (requestId: string) => {
+    if (!confirm('Cancel this payment request?')) return
+
+    await supabase
+      .from('payment_requests')
+      .delete()
+      .eq('id', requestId)
+
+    fetchPaymentRequests()
   }
 
   const totalAmount = transactions.reduce((sum, t) => sum + Number(t.amount), 0)
@@ -277,9 +288,18 @@ export default function VendorPublicView({ params }: Props) {
                         {formatDate(request.created_at)}
                       </p>
                     </div>
-                    <span className="px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs font-medium">
-                      Pending
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 text-xs font-medium">
+                        Pending
+                      </span>
+                      <button
+                        onClick={() => deleteRequest(request.id)}
+                        className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                        title="Cancel request"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
             </div>

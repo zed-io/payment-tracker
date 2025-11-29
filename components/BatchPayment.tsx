@@ -98,6 +98,23 @@ export default function BatchPayment({ requests, vendors, onComplete }: BatchPay
     setBatchItems(items => items.filter(item => item.id !== id))
   }
 
+  const deleteRequest = async (e: React.MouseEvent, requestId: string) => {
+    e.stopPropagation() // Prevent toggling selection
+
+    if (!confirm('Delete this payment request?')) return
+
+    // Remove from batch if selected
+    setBatchItems(items => items.filter(item => item.requestId !== requestId))
+
+    // Delete from database
+    await supabase
+      .from('payment_requests')
+      .delete()
+      .eq('id', requestId)
+
+    onComplete() // Refresh data
+  }
+
   const totalAmount = batchItems.reduce((sum, item) => sum + item.amount, 0)
 
   const processBatch = async (paymentMethod: 'card' | 'cash' | 'other') => {
@@ -232,9 +249,8 @@ export default function BatchPayment({ requests, vendors, onComplete }: BatchPay
             {pendingRequests.map(request => {
               const isSelected = isRequestInBatch(request.id)
               return (
-                <button
+                <div
                   key={request.id}
-                  onClick={() => toggleRequest(request)}
                   className={`w-full p-4 rounded-2xl text-left transition-all ${
                     isSelected
                       ? 'bg-[#B34AFF]/20 border-2 border-[#B34AFF]'
@@ -242,7 +258,10 @@ export default function BatchPayment({ requests, vendors, onComplete }: BatchPay
                   }`}
                 >
                   <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                    <button
+                      onClick={() => toggleRequest(request)}
+                      className="flex-1 text-left"
+                    >
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xl font-bold font-number text-gradient-purple">
                           ${Number(request.amount).toFixed(2)}
@@ -259,16 +278,28 @@ export default function BatchPayment({ requests, vendors, onComplete }: BatchPay
                         <ClockIcon className="w-3 h-3" />
                         {formatDate(request.created_at)}
                       </p>
-                    </div>
-                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                      isSelected
-                        ? 'bg-[#B34AFF] border-[#B34AFF]'
-                        : 'border-gray-300 dark:border-gray-600'
-                    }`}>
-                      {isSelected && <CheckIcon className="w-4 h-4 text-white" />}
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => deleteRequest(e, request.id)}
+                        className="p-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                        title="Delete request"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => toggleRequest(request)}
+                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                          isSelected
+                            ? 'bg-[#B34AFF] border-[#B34AFF]'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}
+                      >
+                        {isSelected && <CheckIcon className="w-4 h-4 text-white" />}
+                      </button>
                     </div>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
